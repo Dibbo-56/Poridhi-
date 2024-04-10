@@ -1,0 +1,116 @@
+# List all interfaces and namespaces just for check 
+
+sudo ip link list
+sudo ip netns list
+
+# add red and green namesspaces
+
+sudo ip netns add red
+sudo ip netns add green
+
+# again check the namespaces list now you will see red and green
+
+sudo ip netns list
+
+# up the loopback network interfaces and check their status
+
+sudo ip netns exec red ip link set lo up
+sudo ip netns exec red ip link
+
+sudo ip netns exec green ip link set lo up
+sudo ip netns exec green ip link
+
+sudo ip link set lo up
+sudo ip link
+
+# create bridge and up it and check it
+
+sudo ip link add br0 type bridge
+sudo ip link set br0 up
+sudo ip link
+
+# configure ip address to bridge and ping it
+
+sudo ip addr add 192.168.1.1/16 dev br0
+sudo ip addr
+ping -c 2 192.168.1.1
+
+# create two virtual ethernet for red and green namespaces to connect them with bridge
+
+sudo ip link add veth-red type veth peer name ceth-red
+sudo ip link set veth-red master br0 
+sudo ip link set veth-red up
+sudo ip link set ceth-red netns red
+sudo ip netns exec red ip link set ceth-red up
+sudo ip link
+sudo ip netns exec red ip link
+
+sudo ip link add veth-green type veth peer name ceth-green
+sudo ip link set veth-green master br0
+sudo ip link set veth-green up
+sudo ip link set ceth-green netns green
+sudo ip netns exec green ip link set ceth-green up
+sudo ip link
+sudo ip netns exec green ip link
+
+# now add ip address to network namespaces
+
+sudo ip netns exec red ip addr add 192.168.1.10/16 dev ceth-red
+sudo ip netns exec red ping -c 2 192.168.1.10
+sudo ip netns exec red ping -c 2 192.168.1.1
+
+sudo ip netns exec green ip addr add 192.168.1.11/16 dev ceth-green
+sudo ip netns exec green ping -c 2 192.168.1.11
+sudo ip netns exec green ping -c 2 192.168.1.1
+
+# verify connectivity between red and green
+
+sudo nsenter --net=/var/run/netns/red
+ping -c 2 192.168.1.11
+exit
+
+sudo nsenter --net=/var/run/netns/green
+ping -c 2 192.168.1.10
+exit
+
+# login to red namespace and add default gateway
+
+sudo nsenter --net=/var/run/netns/red
+route -n
+ip route add default via 192.168.1.1
+route -n
+
+# now ping google public ip from red and it will show 100% packet loss 
+
+ping -c 2 8.8.8.8
+exit
+
+# login to green namespace and add default gateway
+
+sudo nsenter --net=/var/run/netns/green
+route -n
+ip route add default via 192.168.1.1
+route -n
+
+# now ping google public ip from green and it will show 100% packet loss 
+
+ping -c 2 8.8.8.8
+exit
+
+# add firewall rule and uncomment net.ipv4.ip-forward=1 from /etc/sysctl.conf
+
+sudo iptables -t nat -A POSTROUTING -s 192.168.0.0/16 -j MASQUERADE
+sudo iptables -t nat -L -n -v
+
+# login to red and ping google and packet will be transmitted
+
+sudo nsenter --net=/var/run/netns/red
+ping -c 2 8.8.8.8
+exit
+
+# login to green and ping google and packet will be transmitted
+
+sudo nsenter --net=/var/run/netns/green
+ping -c 2 8.8.8.8
+exit
+

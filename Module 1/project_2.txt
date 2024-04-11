@@ -1,0 +1,76 @@
+# List all interfaces and namespaces just for check 
+
+sudo ip link list
+sudo ip netns list
+
+# add ns1 and ns2 namesspaces
+
+sudo ip netns add ns1
+sudo ip netns add ns2
+
+# again check the namespaces list now you will see ns1 and ns2
+
+sudo ip netns list
+
+# up the loopback network interfaces and check their status
+
+sudo ip netns exec ns1 ip link set lo up
+sudo ip netns exec ns1 ip link
+
+sudo ip netns exec ns2 ip link set lo up
+sudo ip netns exec ns2 ip link
+
+sudo ip link set lo up
+sudo ip link
+
+# create bridge and up it and check it
+
+sudo ip link add br0 type bridge
+sudo ip link set br0 up
+sudo ip link
+
+# configure ip address to bridge and ping it
+
+sudo ip addr add 192.168.1.1/16 dev br0
+sudo ip addr
+ping -c 2 192.168.1.1
+
+# create two virtual ethernet for ns1 and ns2 namespaces to connect them with bridge
+
+sudo ip link add veth-ns1 type veth peer name ceth-ns1
+sudo ip link set veth-ns1 master br0 
+sudo ip link set veth-ns1 up
+sudo ip link set ceth-ns1 netns ns1
+sudo ip netns exec ns1 ip link set ceth-ns1 up
+sudo ip link
+sudo ip netns exec ns1 ip link
+
+sudo ip link add veth-ns2 type veth peer name ceth-ns2
+sudo ip link set veth-ns2 master br0
+sudo ip link set veth-ns2 up
+sudo ip link set ceth-ns2 netns ns2
+sudo ip netns exec ns2 ip link set ceth-ns2 up
+sudo ip link
+sudo ip netns exec ns2 ip link
+
+# now add ip address to network namespaces
+
+sudo ip netns exec ns1 ip addr add 192.168.1.10/16 dev ceth-ns1
+sudo ip netns exec ns1 ping -c 2 192.168.1.10
+sudo ip netns exec ns1 ping -c 2 192.168.1.1
+
+sudo ip netns exec ns2 ip addr add 192.168.1.11/16 dev ceth-ns2
+sudo ip netns exec ns2 ping -c 2 192.168.1.11
+sudo ip netns exec ns2 ping -c 2 192.168.1.1
+
+# verify connectivity between ns1 and ns2
+
+sudo nsenter --net=/var/run/netns/ns1
+ping -c 2 192.168.1.11
+exit
+
+sudo nsenter --net=/var/run/netns/ns2
+ping -c 2 192.168.1.10
+exit
+
+

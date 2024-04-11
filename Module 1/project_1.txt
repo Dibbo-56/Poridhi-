@@ -1,0 +1,56 @@
+# List all interfaces and namespaces just for check 
+
+sudo ip link list
+sudo ip netns list
+
+# add ns1 and ns2 namesspaces
+
+sudo ip netns add ns1
+sudo ip netns add ns2
+
+# again check the namespaces list now you will see ns1 and ns2
+
+sudo ip netns list
+
+# up the loopback network interfaces and check their status
+
+sudo ip netns exec ns1 ip link set lo up
+sudo ip netns exec ns1 ip link
+
+sudo ip netns exec ns2 ip link set lo up
+sudo ip netns exec ns2 ip link
+
+sudo ip link set lo up
+sudo ip link
+
+# create one virtual ethernet and connect two namespaces ns1 and ns2
+
+sudo ip link add veth-ns1 type veth peer name ceth-ns2
+
+sudo ip link set veth-ns1 netns ns1
+sudo ip netns exec ns1 ip link set veth-ns1 up
+sudo ip netns exec ns1 ip link
+
+sudo ip link set ceth-ns2 netns ns2
+sudo ip netns exec ns2 ip link set ceth-ns2 up
+sudo ip netns exec ns2 ip link
+
+# now add ip address to network namespaces
+
+sudo ip netns exec ns1 ip addr add 192.168.1.10/16 dev veth-ns1
+sudo ip netns exec ns1 ping -c 2 192.168.1.10
+
+sudo ip netns exec ns2 ip addr add 192.168.1.11/16 dev ceth-ns2
+sudo ip netns exec ns2 ping -c 2 192.168.1.11
+
+# verify connectivity between ns1 and ns2
+
+sudo nsenter --net=/var/run/netns/ns1
+ping -c 2 192.168.1.11
+exit
+
+sudo nsenter --net=/var/run/netns/ns2
+ping -c 2 192.168.1.10
+exit
+
+
